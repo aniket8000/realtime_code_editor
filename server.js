@@ -3,6 +3,7 @@ const app = express();
 
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 const {Server} = require('socket.io');
 
 const ACTIONS = require('./src/actions/Actions');
@@ -18,10 +19,16 @@ const io = new Server(server, {
     },
 });
 
-app.use(express.static('build'));
-app.use((req, res, next) => {
-    res.sendFile(path.join(__dirname, 'build', 'index.html'));
-});
+// Only serve the built React app if it was built alongside this server
+// (the all-in-one Docker setup). When frontend/backend are deployed as
+// separate services, no build/ folder exists here, so this is skipped.
+const buildPath = path.join(__dirname, 'build');
+if (fs.existsSync(buildPath)) {
+    app.use(express.static(buildPath));
+    app.use((req, res, next) => {
+        res.sendFile(path.join(buildPath, 'index.html'));
+    });
+}
 
 const userSocketMap = {};
 function getAllConnectedClients(roomId) {
