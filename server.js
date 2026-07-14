@@ -11,7 +11,12 @@ const {rooms, loadRooms, ensureRoom, scheduleSave} = require('./roomStore');
 loadRooms();
 
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    cors: {
+        origin: process.env.CLIENT_URL || '*',
+        methods: ['GET', 'POST'],
+    },
+});
 
 app.use(express.static('build'));
 app.use((req, res, next) => {
@@ -160,5 +165,5 @@ app.get('/', (req, res) => {
     res.send(htmlContent);
 });
 
-const PORT = process.env.SERVER_PORT || 5000;
+const PORT = process.env.PORT || process.env.SERVER_PORT || 5000;
 server.listen(PORT, () => console.log(`Listening on port ${PORT}`));
