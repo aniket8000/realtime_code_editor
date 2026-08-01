@@ -172,5 +172,9 @@ app.get('/', (req, res) => {
     res.send(htmlContent);
 });
 
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
+
 const PORT = process.env.PORT || process.env.SERVER_PORT || 5000;
 server.listen(PORT, () => console.log(`Listening on port ${PORT}`));
