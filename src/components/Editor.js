@@ -159,6 +159,8 @@ const Editor = React.forwardRef(({ socketRef, roomId, onCodeChange }, ref) => {
     return () => {
       clearRemoteCursors();
     };
+    // The editor is only rebuilt when the language changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang]);
 
   useEffect(() => {
@@ -168,17 +170,19 @@ const Editor = React.forwardRef(({ socketRef, roomId, onCodeChange }, ref) => {
   }, [editorTheme]);
 
   useEffect(() => {
-    if (socketRef.current) {
-      socketRef.current.on(ACTIONS.CODE_CHANGE, ({ code }) => {
-        if (code !== null) {
-          editorRef.current.setValue(code);
-        }
-      });
-    }
+    const socket = socketRef.current;
+    if (!socket) return;
+    socket.on(ACTIONS.CODE_CHANGE, ({ code }) => {
+      if (code !== null) {
+        editorRef.current.setValue(code);
+      }
+    });
 
     return () => {
-      socketRef.current.off(ACTIONS.CODE_CHANGE);
+      socket.off(ACTIONS.CODE_CHANGE);
     };
+    // Re-subscribe once the async socket is created
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socketRef.current]);
 
   useEffect(() => {
@@ -201,10 +205,12 @@ const Editor = React.forwardRef(({ socketRef, roomId, onCodeChange }, ref) => {
     };
     cm.on("cursorActivity", onCursorActivity);
     return () => cm.off("cursorActivity", onCursorActivity);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editorRef.current, roomId]);
 
   useEffect(() => {
-    if (!socketRef.current || !editorRef.current) return;
+    const socket = socketRef.current;
+    if (!socket || !editorRef.current) return;
     const cm = editorRef.current;
 
     const onCursorMove = ({ socketId, username: remoteUsername, cursor }) => {
@@ -248,13 +254,14 @@ const Editor = React.forwardRef(({ socketRef, roomId, onCodeChange }, ref) => {
       }
     };
 
-    socketRef.current.on(ACTIONS.CURSOR_MOVE, onCursorMove);
-    socketRef.current.on(ACTIONS.DISCONNECTED, onDisconnected);
+    socket.on(ACTIONS.CURSOR_MOVE, onCursorMove);
+    socket.on(ACTIONS.DISCONNECTED, onDisconnected);
 
     return () => {
-      socketRef.current.off(ACTIONS.CURSOR_MOVE, onCursorMove);
-      socketRef.current.off(ACTIONS.DISCONNECTED, onDisconnected);
+      socket.off(ACTIONS.CURSOR_MOVE, onCursorMove);
+      socket.off(ACTIONS.DISCONNECTED, onDisconnected);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socketRef.current, editorRef.current]);
 
   return <textarea id="realtimeEditor"></textarea>;

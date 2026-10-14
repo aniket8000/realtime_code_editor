@@ -139,6 +139,8 @@ const EditorPage = () => {
       socketRef.current.off(ACTIONS.JOIN_REJECTED);
       socketRef.current.disconnect();
     };
+    // Connect once per page visit
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function copyRoomId() {

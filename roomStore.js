@@ -4,7 +4,9 @@ const path = require('path');
 const DATA_DIR = path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'rooms.json');
 
-const rooms = {};
+// Null-prototype object so room IDs like "__proto__" or "constructor"
+// can't resolve to built-in Object properties.
+const rooms = Object.create(null);
 
 function loadRooms() {
     fs.mkdirSync(DATA_DIR, { recursive: true });

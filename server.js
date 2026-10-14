@@ -43,10 +43,20 @@ function getAllConnectedClients(roomId) {
     );
 }
 
+function isValidRoomId(roomId) {
+    return typeof roomId === 'string' && roomId.length > 0 && roomId.length <= 100;
+}
+
+// Only sockets that actually joined the room (and weren't kicked) may act on it.
+function isInRoom(socket, roomId) {
+    return isValidRoomId(roomId) && socket.rooms.has(roomId);
+}
+
 io.on('connection', (socket) => {
     console.log('socket connected', socket.id);
 
-    socket.on(ACTIONS.JOIN, ({roomId, username}) => {
+    socket.on(ACTIONS.JOIN, ({roomId, username} = {}) => {
+        if (!isValidRoomId(roomId)) return;
         const room = ensureRoom(roomId);
 
         if (room.locked && username !== room.ownerUsername) {
@@ -83,18 +93,27 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on(ACTIONS.CODE_CHANGE, ({roomId, code}) => {
+    socket.on(ACTIONS.CODE_CHANGE, ({roomId, code} = {}) => {
+        if (!isInRoom(socket, roomId)) return;
         socket.in(roomId).emit(ACTIONS.CODE_CHANGE, {code});
         const room = ensureRoom(roomId);
         room.code = code;
         scheduleSave();
     });
 
-    socket.on(ACTIONS.SYNC_CODE, ({socketId, code}) => {
+    socket.on(ACTIONS.SYNC_CODE, ({socketId, code} = {}) => {
+        // Only sync code to someone who shares a room with the sender
+        const target = io.sockets.sockets.get(socketId);
+        if (!target) return;
+        const sharesRoom = [...socket.rooms].some(
+            (roomId) => roomId !== socket.id && target.rooms.has(roomId)
+        );
+        if (!sharesRoom) return;
         io.to(socketId).emit(ACTIONS.CODE_CHANGE, {code});
     });
 
-    socket.on(ACTIONS.CURSOR_MOVE, ({roomId, cursor}) => {
+    socket.on(ACTIONS.CURSOR_MOVE, ({roomId, cursor} = {}) => {
+        if (!isInRoom(socket, roomId)) return;
         socket.in(roomId).emit(ACTIONS.CURSOR_MOVE, {
             socketId: socket.id,
             username: userSocketMap[socket.id],
@@ -102,18 +121,21 @@ io.on('connection', (socket) => {
         });
     });
 
-    socket.on(ACTIONS.LANGUAGE_CHANGE, ({roomId, lang}) => {
+    socket.on(ACTIONS.LANGUAGE_CHANGE, ({roomId, lang} = {}) => {
+        if (!isInRoom(socket, roomId)) return;
         socket.in(roomId).emit(ACTIONS.LANGUAGE_CHANGE, {lang});
         const room = ensureRoom(roomId);
         room.language = lang;
         scheduleSave();
     });
 
-    socket.on(ACTIONS.RUN_RESULT, ({roomId, output}) => {
+    socket.on(ACTIONS.RUN_RESULT, ({roomId, output} = {}) => {
+        if (!isInRoom(socket, roomId)) return;
         socket.in(roomId).emit(ACTIONS.RUN_RESULT, {output});
     });
 
-    socket.on(ACTIONS.CHAT_MESSAGE, ({roomId, message}) => {
+    socket.on(ACTIONS.CHAT_MESSAGE, ({roomId, message} = {}) => {
+        if (!isInRoom(socket, roomId)) return;
         const room = ensureRoom(roomId);
         const entry = {
             username: userSocketMap[socket.id],
@@ -126,23 +148,25 @@ io.on('connection', (socket) => {
         io.in(roomId).emit(ACTIONS.CHAT_MESSAGE, entry);
     });
 
-    socket.on(ACTIONS.KICK_USER, ({roomId, targetSocketId}) => {
+    socket.on(ACTIONS.KICK_USER, ({roomId, targetSocketId} = {}) => {
+        if (!isInRoom(socket, roomId)) return;
         const room = rooms[roomId];
         if (!room) return;
         if (userSocketMap[socket.id] !== room.ownerUsername) return;
 
-        io.to(targetSocketId).emit(ACTIONS.KICKED, {reason: 'Removed by room owner'});
         const targetSocket = io.sockets.sockets.get(targetSocketId);
-        if (targetSocket) {
-            targetSocket.leave(roomId);
-            socket.in(roomId).emit(ACTIONS.DISCONNECTED, {
-                socketId: targetSocketId,
-                username: userSocketMap[targetSocketId],
-            });
-        }
+        if (!targetSocket || !targetSocket.rooms.has(roomId)) return;
+
+        io.to(targetSocketId).emit(ACTIONS.KICKED, {reason: 'Removed by room owner'});
+        targetSocket.leave(roomId);
+        socket.in(roomId).emit(ACTIONS.DISCONNECTED, {
+            socketId: targetSocketId,
+            username: userSocketMap[targetSocketId],
+        });
     });
 
-    socket.on(ACTIONS.TOGGLE_LOCK, ({roomId}) => {
+    socket.on(ACTIONS.TOGGLE_LOCK, ({roomId} = {}) => {
+        if (!isInRoom(socket, roomId)) return;
         const room = rooms[roomId];
         if (!room) return;
         if (userSocketMap[socket.id] !== room.ownerUsername) return;

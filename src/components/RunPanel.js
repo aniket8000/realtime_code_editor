@@ -50,12 +50,15 @@ const RunPanel = ({ getCode, socketRef, roomId }) => {
     }, [handleDragMove, handleDragEnd]);
 
     useEffect(() => {
-        if (!socketRef.current) return;
+        const socket = socketRef.current;
+        if (!socket) return;
         const onRunResult = ({ output: remoteOutput }) => {
             setOutput(remoteOutput);
         };
-        socketRef.current.on(ACTIONS.RUN_RESULT, onRunResult);
-        return () => socketRef.current.off(ACTIONS.RUN_RESULT, onRunResult);
+        socket.on(ACTIONS.RUN_RESULT, onRunResult);
+        return () => socket.off(ACTIONS.RUN_RESULT, onRunResult);
+        // Re-subscribe once the async socket is created
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [socketRef.current]);
 
     async function handleRun() {
