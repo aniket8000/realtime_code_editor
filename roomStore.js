@@ -26,6 +26,7 @@ function ensureRoom(roomId) {
             code: null,
             language: null,
             ownerUsername: null,
+            ownerToken: null,
             locked: false,
             chat: [],
         };

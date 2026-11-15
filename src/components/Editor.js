@@ -144,10 +144,9 @@ const Editor = React.forwardRef(({ socketRef, roomId, onCodeChange }, ref) => {
       editorRef.current.on("change", (instance, changes) => {
         const { origin } = changes;
         const code = instance.getValue();
-        console.log("main:editor: ", code);
         onCodeChange(code);
         if (origin !== "setValue") {
-          socketRef.current.emit(ACTIONS.CODE_CHANGE, {
+          socketRef.current?.emit(ACTIONS.CODE_CHANGE, {
             roomId,
             code,
           });
@@ -168,22 +167,6 @@ const Editor = React.forwardRef(({ socketRef, roomId, onCodeChange }, ref) => {
       editorRef.current.setOption("theme", editorTheme);
     }
   }, [editorTheme]);
-
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (!socket) return;
-    socket.on(ACTIONS.CODE_CHANGE, ({ code }) => {
-      if (code !== null) {
-        editorRef.current.setValue(code);
-      }
-    });
-
-    return () => {
-      socket.off(ACTIONS.CODE_CHANGE);
-    };
-    // Re-subscribe once the async socket is created
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socketRef.current]);
 
   useEffect(() => {
     if (!editorRef.current) return;

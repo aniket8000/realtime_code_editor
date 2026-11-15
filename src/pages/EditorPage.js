@@ -17,6 +17,22 @@ import {
   useParams,
 } from "react-router-dom";
 
+// localStorage can throw (private mode, blocked storage), so ownership
+// just isn't remembered in that case.
+function loadOwnerToken(roomId) {
+  try {
+    return localStorage.getItem(`ownerToken:${roomId}`);
+  } catch {
+    return null;
+  }
+}
+
+function saveOwnerToken(roomId, token) {
+  try {
+    localStorage.setItem(`ownerToken:${roomId}`, token);
+  } catch {}
+}
+
 const EditorPage = () => {
   const [lang, setLang] = useRecoilState(language);
   const [them, setThem] = useRecoilState(cmtheme);
@@ -47,8 +63,17 @@ const EditorPage = () => {
   }, [chatOpen]);
 
   useEffect(() => {
+    // No username means we are about to redirect home, so don't connect
+    if (!location.state) return;
+    let cancelled = false;
+
     const init = async () => {
-      socketRef.current = await initSocket();
+      const socket = await initSocket();
+      if (cancelled) {
+        socket.disconnect();
+        return;
+      }
+      socketRef.current = socket;
       socketRef.current.on("connect_error", (err) => handleErrors(err));
       socketRef.current.on("connect_failed", (err) => handleErrors(err));
 
@@ -58,9 +83,22 @@ const EditorPage = () => {
         reactNavigator("/");
       }
 
+      // Registered before joining so the room's saved code is never missed
+      socketRef.current.on(ACTIONS.CODE_CHANGE, ({ code }) => {
+        if (typeof code !== "string") return;
+        codeRef.current = code;
+        editorInstanceRef.current?.setCode(code);
+      });
+
+      // Owner token proves ownership of this room on later visits
+      socketRef.current.on(ACTIONS.OWNER_TOKEN, ({ roomId: ownedRoomId, token }) => {
+        saveOwnerToken(ownedRoomId, token);
+      });
+
       socketRef.current.emit(ACTIONS.JOIN, {
         roomId,
         username: location.state?.username,
+        ownerToken: loadOwnerToken(roomId),
       });
 
       // Listening for joined event
@@ -69,7 +107,6 @@ const EditorPage = () => {
         ({ clients, username, socketId, isOwner: joinerIsOwner }) => {
           if (username !== location.state?.username) {
             toast.success(`${username} joined the room.`);
-            console.log(`${username} joined`);
           }
           setClients(clients);
           setIsOwner(joinerIsOwner);
@@ -129,15 +166,20 @@ const EditorPage = () => {
     };
     init();
     return () => {
-      socketRef.current.off(ACTIONS.JOINED);
-      socketRef.current.off(ACTIONS.DISCONNECTED);
-      socketRef.current.off(ACTIONS.LANGUAGE_CHANGE);
-      socketRef.current.off(ACTIONS.ROOM_LOCK_STATE);
-      socketRef.current.off(ACTIONS.CHAT_HISTORY);
-      socketRef.current.off(ACTIONS.CHAT_MESSAGE);
-      socketRef.current.off(ACTIONS.KICKED);
-      socketRef.current.off(ACTIONS.JOIN_REJECTED);
-      socketRef.current.disconnect();
+      cancelled = true;
+      const socket = socketRef.current;
+      if (!socket) return;
+      socket.off(ACTIONS.CODE_CHANGE);
+      socket.off(ACTIONS.OWNER_TOKEN);
+      socket.off(ACTIONS.JOINED);
+      socket.off(ACTIONS.DISCONNECTED);
+      socket.off(ACTIONS.LANGUAGE_CHANGE);
+      socket.off(ACTIONS.ROOM_LOCK_STATE);
+      socket.off(ACTIONS.CHAT_HISTORY);
+      socket.off(ACTIONS.CHAT_MESSAGE);
+      socket.off(ACTIONS.KICKED);
+      socket.off(ACTIONS.JOIN_REJECTED);
+      socket.disconnect();
     };
     // Connect once per page visit
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -187,7 +229,6 @@ const EditorPage = () => {
   }
 
   function handleFileUpload(event) {
-    console.log("hello");
     const file = event.target.files[0];
     if (file) {
       const reader = new FileReader();
@@ -408,7 +449,7 @@ const EditorPage = () => {
               locked && (
                 <span
                   className="lockBadge"
-                  title="Ownership is by username only — not authenticated"
+                  title="Only the room owner can unlock this room"
                 >
                   Room Locked
                 </span>
@@ -440,7 +481,6 @@ const EditorPage = () => {
           socketRef={socketRef}
           roomId={roomId}
           onCodeChange={(code) => {
-            console.log("on code change" + code);
             codeRef.current = code;
           }}
         />

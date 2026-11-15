@@ -38,7 +38,7 @@ Are you tired of sending code snippets back and forth, struggling to debug and c
 - The first person to join a room becomes its owner
 - Owners can lock a room to prevent new users from joining mid-session
 - Owners can kick a disruptive user out of the room
-- **Note:** ownership is tracked by username only, since the app has no authentication/login system — this is a convenience feature for casual/trusted use, not a security boundary
+- **Note:** the owner's browser receives a secret owner token (saved in localStorage) that proves ownership on later visits, so typing the owner's username isn't enough. There's no login system, so ownership doesn't carry over to another browser or device
 
 ### File & code management
 
@@ -142,6 +142,17 @@ This opens `http://localhost:3000` automatically in your browser.
 Follow steps 5-7 from the [Running via Docker Image](#running-via-docker-image-highly-recommended) section to create and join a room.
 
 **Note:** To stop the backend server, press `Ctrl+c` or if you used "pm2", then use `pm2 stop server.js` in the terminal.
+
+### Health Check
+
+With the backend running, this connects fake users and checks every realtime feature and security rule:
+
+```
+npm run healthcheck                                   # local server on port 5000
+npm run healthcheck -- https://your-backend.onrender.com   # deployed server
+```
+
+It creates one throwaway room named `healthcheck-<timestamp>`.
 
 **Note:** If you find any bugs, please create an Issue in this repository. <br>
 In case you want to fix it yourself, feel free to make a pull request.

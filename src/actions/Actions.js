@@ -15,6 +15,7 @@ const ACTIONS = {
     TOGGLE_LOCK: 'toggle-lock',
     ROOM_LOCK_STATE: 'room-lock-state',
     JOIN_REJECTED: 'join-rejected',
+    OWNER_TOKEN: 'owner-token',
 };
 
 module.exports = ACTIONS;
